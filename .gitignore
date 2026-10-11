@@ -1,0 +1,13 @@
+# SwiftPM
+.build/
+.swiftpm/
+
+# Xcode
+xcuserdata/
+DerivedData/
+
+# Editors, macOS
+.vscode/
+.DS_Store
+*.swp
+Package.resolved
