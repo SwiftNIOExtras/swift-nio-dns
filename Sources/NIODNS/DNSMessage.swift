@@ -273,7 +273,7 @@ extension DNSMessage.ResponseCode: CustomStringConvertible {
 
 extension DNSMessage {
 
-  /// Canonical domain name ("WWW.Example.org." => "www.example.org")
+  /// Canonical domain name ("WWW.ZeeZide.de." => "www.zeezide.de")
   @inlinable public static func canonicalName(_ name: String) -> String {
     String(withoutRootDot(name)).lowercased()
   }

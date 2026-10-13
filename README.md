@@ -9,16 +9,14 @@ Raw DNS support for SwiftNIO.
 ### Client
 
 ```swift
-let options = DNSQuery.Options(servers: [
+let client = DNSClient(options: .init(servers: [
   try SocketAddress(ipAddress: "9.9.9.9", port: 53)
-])
-let query = DNSQuery(name: "zeezide.de", type: .txt, options: options,
-                     eventLoop: group.next())
-query.start().whenComplete { result in
+]))
+client.query("zeezide.de", kind: .txt).result.whenComplete { result in
   switch result {
     case .success(let message):
       for record in message.answers { print(record.data) }
-    case .failure(let error): // a DNSQueryError
+    case .failure(let error): // a DNSClient.QueryError
       print("query failed:", error)
   }
 }
