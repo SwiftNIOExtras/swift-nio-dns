@@ -114,6 +114,33 @@ public final class DNSClient: Sendable {
     return query
   }
 
+  /**
+   * Sends a query for a name and record type.
+   *
+   * ```swift
+   * let message = try await client.query("zeezide.de", kind: .mx)
+   * for record in message.answers {
+   *   if case .mx(let preference, let exchange) = record.data { ... }
+   * }
+   * ```
+   *
+   * - Parameters:
+   *   - name:      Name.
+   *   - kind:      Record type.
+   *   - eventLoop: Event loop.
+   * - Returns:     The response.
+   */
+  public func query(_       name : String, kind: DNSRecord.Kind,
+                    on eventLoop : EventLoop? = nil) async throws -> DNSMessage
+  {
+    let query : Query = self.query(name, kind: kind, on: eventLoop)
+
+    return try await withTaskCancellationHandler(
+      operation : { try await query.result.get() },
+      onCancel  : { query.cancel() }
+    )
+  }
+
   /// Shuts the client down. Running queries are not affected.
   public func shutdown() -> EventLoopFuture<Void> {
     // Does nothing yet, just in case we want to add TCP pools later.
