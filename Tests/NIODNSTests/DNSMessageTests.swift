@@ -13,7 +13,7 @@ import NIOCore
 final class DNSMessageTests: XCTestCase {
 
   func testEncodeQuery() throws {
-    let query = DNSMessage(id: 0x1234, name: "example.org", kind: .mx,
+    let query = DNSMessage(id: 0x1234, name: "zeezide.de", kind: .mx,
                            ednsPayloadSize: nil) // otherwise set to default
     let bytes = try query.toByteBuffer()
     XCTAssertEqual(bytes, ByteBuffer(bytes: [
@@ -21,8 +21,8 @@ final class DNSMessageTests: XCTestCase {
       0x01, 0x00,             // flags: recursion desired
       0x00, 0x01,             // one question
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      7, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, // example (7 chars)
-      3, 0x6F, 0x72, 0x67,    // org  (3 chars)
+      7, 0x7A, 0x65, 0x65, 0x7A, 0x69, 0x64, 0x65, // zeezide (7 chars)
+      2, 0x64, 0x65,          // de   (2 chars)
       0,                      // root (empty string)
       0x00, 0x0F,             // MX   Type/Kind
       0x00, 0x01              // IN   Class
@@ -74,10 +74,10 @@ final class DNSMessageTests: XCTestCase {
   }
 
   func testEncodeCompressesNames() throws {
-    let bytes = try response(.mx(preference: 10, exchange: "mail.EXAMPLE.org"))
+    let bytes = try response(.mx(preference: 10, exchange: "mail.ZEEZIDE.de"))
 
-    // The answer starts behind the header and the question (17 bytes).
-    let answer = bytes.getBytes(at: 29, length: bytes.readableBytes - 29)
+    // The answer starts behind the header and the question (16 bytes).
+    let answer = bytes.getBytes(at: 28, length: bytes.readableBytes - 28)
     XCTAssertEqual(answer, [
       0xC0, 0x0C,             // owner: pointer to the question name
       0x00, 0x0F,             // MX
@@ -86,47 +86,47 @@ final class DNSMessageTests: XCTestCase {
       0x00, 0x09,             // record data length
       0x00, 0x0A,             // preference
       4, 0x6D, 0x61, 0x69, 0x6C, // mail
-      0xC0, 0x0C              // + pointer to `example.org`, any case
+      0xC0, 0x0C              // + pointer to `zeezide.de`, any case
     ])
   }
 
   func testEncodeLeavesSRVAndNAPTRNamesUncompressed() throws {
     let bytes =
-      try response(.srv(priority: 1, weight: 2, port: 3, target: "example.org"))
+      try response(.srv(priority: 1, weight: 2, port: 3, target: "zeezide.de"))
     let message = try DNSMessage(bytes: bytes)
-    // The record data length behind the 29 bytes of header and question,
+    // The record data length behind the 28 bytes of header and question,
     // and 10 of the record: priority, weight, port + the name in full
-    // (7 example 3 org 0).
-    XCTAssertEqual(bytes.getInteger(at: 39, as: UInt16.self), 6 + 13)
+    // (7 zeezide 2 de 0).
+    XCTAssertEqual(bytes.getInteger(at: 38, as: UInt16.self), 6 + 12)
     XCTAssertEqual(message.answers.first?.data,
                    .srv(priority: 1, weight: 2, port: 3,
-                        target: "example.org"))
+                        target: "zeezide.de"))
   }
 
   func testRoundTrip() throws {
     let data : [ DNSRecord.Data ] = [
-      .a("192.0.2.1"), .aaaa("2001:db8::1"), .cname("www.example.org"),
-      .ns("ns1.example.org"), .ptr("host.example.org"),
-      .mx(preference: 10, exchange: "mail.example.org"),
+      .a("192.0.2.1"), .aaaa("2001:db8::1"), .cname("www.zeezide.de"),
+      .ns("ns1.zeezide.de"), .ptr("host.zeezide.de"),
+      .mx(preference: 10, exchange: "mail.zeezide.de"),
       .txt([ "v=spf1 -all", String(repeating: "k", count: 255), "" ]),
-      .soa(.init(mname: "ns1.example.org", rname: "hostmaster.example.org",
+      .soa(.init(mname: "ns1.zeezide.de", rname: "hostmaster.zeezide.de",
                  serial: 2026100401, refresh: 7200, retry: 3600,
                  expire: 1209600, minimum: 300)),
-      .srv(priority: 5, weight: 10, port: 993, target: "imap.example.org"),
+      .srv(priority: 5, weight: 10, port: 993, target: "imap.zeezide.de"),
       .caa(flags: 128, tag: "issue", value: "letsencrypt.org"),
       .naptr(.init(order: 100, preference: 50, flags: "s",
                    services: "SIP+D2U", regexp: "",
-                   replacement: "_sip._udp.example.org")),
+                   replacement: "_sip._udp.zeezide.de")),
       .tlsa(usage: 3, selector: 1, matchingType: 1,
             data: ByteBuffer(bytes: [ 0xDE, 0xAD, 0xBE, 0xEF ]))
     ]
     let records = data.enumerated().map { // a different TTL per record
-      DNSRecord(name: "example.org", ttl: UInt32($0.offset), data: $0.element)
+      DNSRecord(name: "zeezide.de", ttl: UInt32($0.offset), data: $0.element)
     }
-    let ns   = DNSRecord (name: "example.org", ttl: 300,
-                          data: .ns("ns2.example.org"))
+    let ns   = DNSRecord (name: "zeezide.de", ttl: 300,
+                          data: .ns("ns2.zeezide.de"))
     var sent = DNSMessage(id: 0xBEEF, flags: [ .response, .authoritative ],
-                          questions: [ .init(name: "example.org", kind: .any) ],
+                          questions: [ .init(name: "zeezide.de", kind: .any) ],
                           answers: records, authorities: [ ns ],
                           additionals: [ .edns(payloadSize: 4096) ])
     sent.responseCode = .nameError
@@ -140,9 +140,9 @@ final class DNSMessageTests: XCTestCase {
     XCTAssertEqual(received.answers.map { $0.data }, records.map { $0.data })
     XCTAssertEqual(received.answers.map { $0.kind }, records.map { $0.kind })
     XCTAssertEqual(received.answers.map { $0.ttl },  records.map { $0.ttl })
-    XCTAssertEqual(Set(received.answers.map { $0.name }), [ "example.org" ])
+    XCTAssertEqual(Set(received.answers.map { $0.name }), [ "zeezide.de" ])
     XCTAssertEqual(received.authorities.map { $0.data },
-                   [ .ns("ns2.example.org") ])
+                   [ .ns("ns2.zeezide.de") ])
     XCTAssertEqual(received.ednsPayloadSize, 4096)
   }
 
@@ -157,19 +157,19 @@ final class DNSMessageTests: XCTestCase {
 
   func testEncodeRejectsInvalidRecordData() {
     let invalid : [ DNSRecord.Data ] = [
-      .a("2001:db8::1"), .aaaa("192.0.2.1"), .a("example.org"),
+      .a("2001:db8::1"), .aaaa("192.0.2.1"), .a("zeezide.de"),
       .txt([ String(repeating: "k", count: 256) ]),
       .mx(preference: 1, exchange: "a..b")
     ]
     for data in invalid {
-      let record  = DNSRecord(name: "example.org", ttl: 300, data: data)
+      let record  = DNSRecord(name: "zeezide.de", ttl: 300, data: data)
       let message = DNSMessage(id: 1, answers: [ record ])
       XCTAssertThrowsError(try message.toByteBuffer(), "\(data)")
     }
   }
 
   func testResponseToQuery() throws {
-    let query    = try DNSMessage(bytes: try self.query("example.org", .mx))
+    let query    = try DNSMessage(bytes: try self.query("zeezide.de", .mx))
     var response = DNSMessage(responseTo: query, responseCode: .refused)
     XCTAssertEqual(response.id, 7)
     XCTAssertEqual(response.questions, query.questions)
@@ -182,7 +182,7 @@ final class DNSMessageTests: XCTestCase {
   }
 
   func testParseResponse() throws {
-    let bytes = try response(.mx(preference: 10, exchange: "mail.example.org"))
+    let bytes = try response(.mx(preference: 10, exchange: "mail.zeezide.de"))
     let message = try DNSMessage(bytes: bytes)
 
     XCTAssertEqual(message.id, 7)
@@ -190,14 +190,14 @@ final class DNSMessageTests: XCTestCase {
     XCTAssertFalse(message.isTruncated)
     XCTAssertEqual(message.responseCode, .noError)
     XCTAssertEqual(message.questions, [
-      DNSMessage.Question(name: "example.org", kind: .mx)
+      DNSMessage.Question(name: "zeezide.de", kind: .mx)
     ])
     XCTAssertEqual(message.answers.count, 1)
-    XCTAssertEqual(message.answers.first?.name, "example.org")
+    XCTAssertEqual(message.answers.first?.name, "zeezide.de")
     XCTAssertEqual(message.answers.first?.kind, .mx)
     XCTAssertEqual(message.answers.first?.ttl,  300)
     XCTAssertEqual(message.answers.first?.data,
-                   .mx(preference: 10, exchange: "mail.example.org"))
+                   .mx(preference: 10, exchange: "mail.zeezide.de"))
   }
 
   func testParseStartsAtReaderIndex() throws {
@@ -217,18 +217,18 @@ final class DNSMessageTests: XCTestCase {
     let bytes   = try response(.other(type: .mx, rdata: data))
     let message = try DNSMessage(bytes: bytes)
     XCTAssertEqual(message.answers.first?.data,
-                   .mx(preference: 20, exchange: "mail.example.org"))
+                   .mx(preference: 20, exchange: "mail.zeezide.de"))
   }
 
   func testParseRejectsPointerLoops() throws {
-    // The exchange starts at offset 43: 12 bytes header, 17 question, 12
+    // The exchange starts at offset 42: 12 bytes header, 16 question, 12
     // up to the record data, 2 for the preference. One name points at
     // itself, the other one forwards.
-    for target : UInt8 in [ 43, 60 ] {
+    for target : UInt8 in [ 42, 60 ] {
       let data  = ByteBuffer(bytes: [ 0, 20, DNSMessage.pointerMarker, target ])
       let bytes = try response(.other(type: .mx, rdata: data))
-      XCTAssertEqual(bytes.readableBytes, 45)
-      XCTAssertEqual(bytes.getInteger(at: 43, as: UInt8.self),
+      XCTAssertEqual(bytes.readableBytes, 44)
+      XCTAssertEqual(bytes.getInteger(at: 42, as: UInt8.self),
                      DNSMessage.pointerMarker)
       XCTAssertThrowsError(try DNSMessage(bytes: bytes)) {
         XCTAssertEqual($0 as? DNSMessage.MessageError, .invalidPointer)
@@ -260,8 +260,8 @@ final class DNSMessageTests: XCTestCase {
   }
 
   func testParseTruncatedMessage() throws {
-    let complete = try response(.mx(preference: 10, exchange: "a.example.org"),
-                                .mx(preference: 20, exchange: "b.example.org"))
+    let complete = try response(.mx(preference: 10, exchange: "a.zeezide.de"),
+                                .mx(preference: 20, exchange: "b.zeezide.de"))
     var cut = complete
     cut.moveWriterIndex(to: complete.writerIndex - 5) // cut the second one
 
@@ -276,7 +276,7 @@ final class DNSMessageTests: XCTestCase {
     let message = try DNSMessage(bytes: cut)
     XCTAssertTrue (message.isTruncated)
     XCTAssertEqual(message.answers.map { $0.data }, [
-      .mx(preference: 10, exchange: "a.example.org")
+      .mx(preference: 10, exchange: "a.zeezide.de")
     ])
 
     // A header cut short is malformed in any case.
@@ -358,9 +358,9 @@ final class DNSMessageTests: XCTestCase {
   }
 
   func testCanonicalName() {
-    XCTAssertEqual(DNSMessage.canonicalName("WWW.Example.org."),
-                   "www.example.org")
-    XCTAssertEqual(DNSMessage.canonicalName("example.org"), "example.org")
+    XCTAssertEqual(DNSMessage.canonicalName("WWW.ZeeZide.de."),
+                   "www.zeezide.de")
+    XCTAssertEqual(DNSMessage.canonicalName("zeezide.de"), "zeezide.de")
     XCTAssertEqual(DNSMessage.canonicalName("."), "")
     XCTAssertEqual(DNSMessage.canonicalName(""),  "")
   }
@@ -375,7 +375,7 @@ final class DNSMessageTests: XCTestCase {
   }
 
   /**
-   * The encoded response to a query for `example.org`, asking for the kind of
+   * The encoded response to a query for `zeezide.de`, asking for the kind of
    * the first answer (`A` if there is none).
    */
   private func response(_    answers : DNSRecord.Data...,
@@ -384,10 +384,10 @@ final class DNSMessageTests: XCTestCase {
   {
     let kind  = answers.first?.kind ?? .a
     let query = DNSMessage(id: 7, flags: .recursionDesired, questions: [
-      DNSMessage.Question(name: "example.org", kind: kind)
+      DNSMessage.Question(name: "zeezide.de", kind: kind)
     ])
     let records = answers.map {
-      DNSRecord(name: "example.org", ttl: 300, data: $0)
+      DNSRecord(name: "zeezide.de", ttl: 300, data: $0)
     }
     return try DNSMessage(responseTo: query, responseCode: responseCode,
                           answers: records).toByteBuffer()
