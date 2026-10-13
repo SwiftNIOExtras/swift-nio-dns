@@ -41,7 +41,7 @@ let refusing = DNSServer.bind { query in
 
 ### Who
 
-**Macro** is brought to you by
+**NIODNS** is brought to you by
 [Helge Heß](https://github.com/helje5/) / [ZeeZide](https://zeezide.de).
 We like feedback, GitHub stars, cool contract work, 
 presumably any form of praise you can think of.
