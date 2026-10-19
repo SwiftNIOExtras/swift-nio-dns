@@ -29,7 +29,7 @@ import NIOPosix
  */
 public final class DNSClient: Sendable {
 
-  public struct Options: Sendable {
+  public struct Options: Hashable, Sendable {
 
     public var servers         : [ SocketAddress ]
 
