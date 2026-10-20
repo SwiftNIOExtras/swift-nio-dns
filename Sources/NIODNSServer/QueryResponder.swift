@@ -54,13 +54,23 @@ final class QueryResponder: Sendable {
                -> ByteBuffer?
   {
     // If too large for UDP, replaced w/ question and truncation flag.
-    let limit = query.tcp
-      ? Int(UInt16.max)
-      : max(DNSMessage.maxUDPPayloadSize,
-            Int(query.message.ednsPayloadSize ?? 0))
+    let limit = query.tcp ? Int(UInt16.max)
+                          : max(DNSMessage.maxUDPPayloadSize,
+                                Int(query.message.ednsPayloadSize ?? 0))
 
-    lazy var fallback =
-      DNSMessage(responseTo: query.message, responseCode: .serverFailure)
+    // An EDNS client gets an OPT record back, unless the responder added one.
+    func withEDNS(_ message: DNSMessage) -> DNSMessage {
+      guard query.message.ednsPayloadSize != nil,
+            message.ednsPayloadSize == nil else { return message }
+      var message = message
+      message.additionals
+        .append(.edns(payloadSize: DNSMessage.defaultEDNSPayloadSize))
+      return message
+    }
+
+    let response = withEDNS(response)
+    lazy var fallback = withEDNS(
+      DNSMessage(responseTo: query.message, responseCode: .serverFailure))
 
     if let bytes = try? response.toByteBuffer() {
       guard bytes.readableBytes > limit else { return bytes }
