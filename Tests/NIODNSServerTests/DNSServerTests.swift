@@ -94,6 +94,48 @@ final class DNSServerTests: XCTestCase {
     XCTAssertEqual(server.queryCounts.tcp, 1)
   }
 
+  func testEDNSQueryGetsOPTRecordBack() throws {
+    let server = try start(zone)
+
+    let edns = try ask(server, "zeezide.de", .a)
+    XCTAssertEqual(edns.ednsPayloadSize, DNSMessage.defaultEDNSPayloadSize)
+    XCTAssertEqual(edns.additionals.filter({ $0.kind == .opt }).count, 1)
+
+    // A plain query gets none.
+    let plain = try ask(server, "zeezide.de", .a, ednsPayloadSize: nil)
+    XCTAssertNil (plain.ednsPayloadSize)
+    XCTAssertTrue(plain.additionals.isEmpty)
+
+  }
+
+  func testTruncatedFallbackKeepsOPTRecord() throws {
+    let key    = String(repeating: "k", count: 255)
+    let server = try start(DNSServer.zone([
+      DNSRecord(name: "zeezide.de", ttl: 300, data: .txt([ key, key, key ]))
+    ]))
+    let group  = MultiThreadedEventLoopGroup.singleton
+    let client = try DatagramBootstrap(group: group)
+      .bind(host: "127.0.0.1", port: 0).wait()
+    defer { try? client.close().wait() }
+
+    let collector = ResponseCollector<AddressedEnvelope<ByteBuffer>>(
+      datagrams: client.eventLoop, expected: 1)
+    try client.pipeline.addHandler(collector).wait()
+    // Announces 512 bytes, the answer does not fit: truncated over UDP.
+    let query = try DNSMessage(id: 0x1234, name: "zeezide.de", kind: .txt,
+                               ednsPayloadSize: 512).toByteBuffer()
+    try client.writeAndFlush(
+      AddressedEnvelope(remoteAddress: server.localAddress, data: query)
+    ).wait()
+
+    let response = try collector.done.futureResult
+      .wait().first
+    XCTAssertEqual(response?.isTruncated,     true)
+    XCTAssertEqual(response?.answers.isEmpty, true)
+    XCTAssertEqual(response?.ednsPayloadSize,
+                   DNSMessage.defaultEDNSPayloadSize)
+  }
+
   func testSeveralQueriesOverOneTCP() throws {
     let server = try start(zone)
     let names  = [ "zeezide.de", "www.zeezide.de", "nope.zeezide.de" ]
